@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart-Attend</title>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #eef5fb;
+    }
+
+    h1 {
+      color: #0a4d8c;
+    }
+
+    .box {
+      margin: 20px;
+      padding: 20px;
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    video {
+      border-radius: 10px;
+    }
+
+    #name, #temp, #status {
+      font-size: 22px;
+      font-weight: bold;
+      margin: 10px;
+    }
+
+    #status {
+      color: green;
+    }
+
+    button {
+      padding: 15px 25px;
+      margin: 10px;
+      border: none;
+      border-radius: 10px;
+      background: #0a4d8c;
+      color: white;
+      font-size: 16px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Smart-Attend</h1>
+
+<div class="box">
+  <video id="webcam" autoplay playsinline width="250"></video>
+  <div id="name">Student: -</div>
+  <div id="temp">Temp: -</div>
+  <div id="status">Status: -</div>
+</div>
+
+<button onclick="connectBLE()">Connect Sensor</button>
+<button onclick="recordData()">Record</button>
+
+<script>
+let studentName = "-";
+let temperature = 36.5;
+
+// TEACHABLE MACHINE MODEL
+const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
+
+async function init() {
+  const model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+
+  const webcam = document.getElementById("webcam");
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  webcam.srcObject = stream;
+
+  setInterval(async () => {
+    const prediction = await model.predict(webcam);
+    prediction.sort((a,b)=>b.probability-a.probability);
+
+    let result = prediction[0];
+
+    if(result.probability < 0.85){
+      studentName = "Pelajar tak dikenal";
+    } else {
+      if(result.className == "Aniq") studentName = "Aniq";
+      else if(result.className == "Huzaifah") studentName = "Hu
