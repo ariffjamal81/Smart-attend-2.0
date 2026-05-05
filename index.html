@@ -6,12 +6,6 @@
 
 <body>
 
-  <!-- 🔥 WAJIB: TensorFlow.js -->
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-
-<!-- ✅ Teachable Machine -->
-<script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
-  
   <h2>AI Camera Test</h2>
 
   <button onclick="init()">Start Camera</button>
@@ -19,11 +13,14 @@
   <div id="webcam-container"></div>
   <div id="label-container"></div>
 
-  <!-- ✅ Teachable Machine library (WAJIB atas) -->
+  <!-- 🔥 TensorFlow.js -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+
+  <!-- ✅ Teachable Machine -->
   <script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 
   <script>
-    // 🔥 LETAK LINK MODEL KAU SINI
+    // ⚠️ PENTING: KENA TEACHABLE MACHINE LINK (BUKAN GITHUB)
     const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
 
     let model, webcam, labelContainer, maxPredictions;
@@ -32,24 +29,23 @@
       const modelURL = URL + "model.json";
       const metadataURL = URL + "metadata.json";
 
-      // load model
       model = await tmImage.load(modelURL, metadataURL);
       maxPredictions = model.getTotalClasses();
 
-      // setup webcam
       webcam = new tmImage.Webcam(200, 200, true);
       await webcam.setup();
       await webcam.play();
-
-      window.requestAnimationFrame(loop);
 
       document.getElementById("webcam-container").appendChild(webcam.canvas);
 
       labelContainer = document.getElementById("label-container");
       labelContainer.innerHTML = "";
+
       for (let i = 0; i < maxPredictions; i++) {
         labelContainer.appendChild(document.createElement("div"));
       }
+
+      window.requestAnimationFrame(loop);
     }
 
     async function loop() {
@@ -62,12 +58,12 @@
       const prediction = await model.predict(webcam.canvas);
 
       for (let i = 0; i < maxPredictions; i++) {
-        const classPrediction =
-          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-
-        labelContainer.childNodes[i].innerHTML = classPrediction;
+        labelContainer.childNodes[i].innerHTML =
+          prediction[i].className + ": " +
+          prediction[i].probability.toFixed(2);
       }
     }
   </script>
+
 </body>
 </html>
