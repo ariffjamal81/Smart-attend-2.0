@@ -1,0 +1,17 @@
+{
+  "name": "Smart Attend 2.0",
+  "short_name": "AttendAI",
+  "description": "AI-powered attendance system with facial recognition and temperature monitoring",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://upload.wikimedia.org/wikipedia/ms/3/38/Sekolah_Menengah_Kebangsaan_Saujana_Impian.jpg",
+      "sizes": "192x192",
+      "type": "image/jpg"
+    }
+  ]
+}
