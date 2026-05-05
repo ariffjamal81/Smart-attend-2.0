@@ -1,69 +1,98 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Camera AI</title>
+  <title>Smart Attend AI</title>
 </head>
 
 <body>
 
-  <h2>AI Camera Test</h2>
+<h2>Smart Attendance AI</h2>
 
-  <button onclick="init()">Start Camera</button>
+<button onclick="init()">Start Camera</button>
 
-  <div id="webcam-container"></div>
-  <div id="label-container"></div>
+<div id="webcam-container"></div>
+<div id="label-container"></div>
 
-  <!-- 🔥 TensorFlow.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 
-  <!-- ✅ Teachable Machine -->
-  <script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+<script>
+const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
 
-  <script>
-    // ⚠️ PENTING: KENA TEACHABLE MACHINE LINK (BUKAN GITHUB)
-    const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
+// 🔥 PASTE GOOGLE APPS SCRIPT URL KAU SINI
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbyXSDABW5M2ocSvbDrkcr-VeHbgE1MveFDY2sQ9vLqwaByb4oXPnK-sgnHvJgNzLmetoQ/exec";
 
-    let model, webcam, labelContainer, maxPredictions;
+let model, webcam, labelContainer, maxPredictions;
 
-    async function init() {
-      const modelURL = URL + "model.json";
-      const metadataURL = URL + "metadata.json";
+async function init() {
+  const modelURL = URL + "model.json";
+  const metadataURL = URL + "metadata.json";
 
-      model = await tmImage.load(modelURL, metadataURL);
-      maxPredictions = model.getTotalClasses();
+  model = await tmImage.load(modelURL, metadataURL);
+  maxPredictions = model.getTotalClasses();
 
-      webcam = new tmImage.Webcam(200, 200, true);
-      await webcam.setup();
-      await webcam.play();
+  webcam = new tmImage.Webcam(200, 200, true);
+  await webcam.setup();
+  await webcam.play();
 
-      document.getElementById("webcam-container").appendChild(webcam.canvas);
+  document.getElementById("webcam-container").appendChild(webcam.canvas);
 
-      labelContainer = document.getElementById("label-container");
-      labelContainer.innerHTML = "";
+  labelContainer = document.getElementById("label-container");
 
-      for (let i = 0; i < maxPredictions; i++) {
-        labelContainer.appendChild(document.createElement("div"));
-      }
+  for (let i = 0; i < maxPredictions; i++) {
+    labelContainer.appendChild(document.createElement("div"));
+  }
 
-      window.requestAnimationFrame(loop);
+  window.requestAnimationFrame(loop);
+}
+
+async function loop() {
+  webcam.update();
+  await predict();
+  window.requestAnimationFrame(loop);
+}
+
+let lastSent = "";
+
+async function predict() {
+  const prediction = await model.predict(webcam.canvas);
+
+  let best = prediction[0];
+
+  for (let i = 0; i < prediction.length; i++) {
+    if (prediction[i].probability > best.probability) {
+      best = prediction[i];
     }
+  }
 
-    async function loop() {
-      webcam.update();
-      await predict();
-      window.requestAnimationFrame(loop);
-    }
+  let name = best.className;
+  let confidence = best.probability.toFixed(2);
 
-    async function predict() {
-      const prediction = await model.predict(webcam.canvas);
+  labelContainer.innerHTML =
+    "Student: " + name + "<br>Confidence: " + confidence;
 
-      for (let i = 0; i < maxPredictions; i++) {
-        labelContainer.childNodes[i].innerHTML =
-          prediction[i].className + ": " +
-          prediction[i].probability.toFixed(2);
-      }
-    }
-  </script>
+  // 🔥 ELAK SPAM (hantar setiap 5 saat sahaja)
+  if (confidence > 0.85 && lastSent !== name) {
+    lastSent = name;
+
+    sendToSheet(name, confidence);
+  }
+}
+
+function sendToSheet(name, confidence) {
+  let now = new Date();
+
+  fetch(SHEET_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      time: now.toLocaleTimeString(),
+      name: name,
+      status: "Present",
+      confidence: confidence
+    })
+  });
+}
+</script>
 
 </body>
 </html>
