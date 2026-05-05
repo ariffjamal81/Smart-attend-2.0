@@ -1,47 +1,98 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Attend AI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Attend 2.0</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      margin: 0;
+      background: #f2f4f8;
+      text-align: center;
+    }
+
+    .header {
+      background: #1e3a8a;
+      color: white;
+      padding: 15px;
+    }
+
+    .logo {
+      width: 80px;
+      margin-top: 10px;
+      border-radius: 10px;
+    }
+
+    .card {
+      background: white;
+      margin: 15px;
+      padding: 15px;
+      border-radius: 15px;
+    }
+
+    button {
+      padding: 12px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+
+    #webcam-container canvas {
+      width: 100%;
+      border-radius: 10px;
+    }
+
+    .result {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 
 <body>
 
-<h2>Smart Attendance AI</h2>
+<div class="header">
+  <h2>Smart Attend 2.0</h2>
 
-<button onclick="init()">Start Camera</button>
+  <img class="logo"
+  src="https://upload.wikimedia.org/wikipedia/ms/3/38/Sekolah_Menengah_Kebangsaan_Saujana_Impian.jpg">
+</div>
 
-<div id="webcam-container"></div>
-<div id="label-container"></div>
+<div class="card">
+  <button onclick="init()">Start Camera</button>
 
+  <div id="webcam-container"></div>
+
+  <div class="result" id="label-container">Ready</div>
+</div>
+
+<!-- TensorFlow + Teachable Machine -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 <script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 
 <script>
+
 const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
 
-// 🔥 PASTE GOOGLE APPS SCRIPT URL KAU SINI
-const SHEET_URL = "https://script.google.com/macros/s/AKfycbyXSDABW5M2ocSvbDrkcr-VeHbgE1MveFDY2sQ9vLqwaByb4oXPnK-sgnHvJgNzLmetoQ/exec";
+/* 🔥 PASTE WEB APP LINK KAU SINI */
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbwxQ1b90Xbwm7XWwJeI1DQXQd4OnvtJV61T154b28cSDLvHfdeT6qoeXSqtxTAmzZ4-bg/exec";
 
 let model, webcam, labelContainer, maxPredictions;
 
 async function init() {
-  const modelURL = URL + "model.json";
-  const metadataURL = URL + "metadata.json";
+  model = await tmImage.load(URL + "model.json", URL + "metadata.json");
 
-  model = await tmImage.load(modelURL, metadataURL);
-  maxPredictions = model.getTotalClasses();
-
-  webcam = new tmImage.Webcam(200, 200, true);
+  webcam = new tmImage.Webcam(250, 250, true);
   await webcam.setup();
   await webcam.play();
 
   document.getElementById("webcam-container").appendChild(webcam.canvas);
 
   labelContainer = document.getElementById("label-container");
-
-  for (let i = 0; i < maxPredictions; i++) {
-    labelContainer.appendChild(document.createElement("div"));
-  }
 
   window.requestAnimationFrame(loop);
 }
@@ -55,7 +106,7 @@ async function loop() {
 let lastSent = "";
 
 async function predict() {
-  const prediction = await model.predict(webcam.canvas);
+  let prediction = await model.predict(webcam.canvas);
 
   let best = prediction[0];
 
@@ -65,33 +116,24 @@ async function predict() {
     }
   }
 
-  let name = best.className;
-  let confidence = best.probability.toFixed(2);
-
   labelContainer.innerHTML =
-    "Student: " + name + "<br>Confidence: " + confidence;
+    "👤 " + best.className +
+    "<br>📊 " + best.probability.toFixed(2);
 
-  // 🔥 ELAK SPAM (hantar setiap 5 saat sahaja)
-  if (confidence > 0.85 && lastSent !== name) {
-    lastSent = name;
+  if (best.probability > 0.85 && lastSent !== best.className) {
+    lastSent = best.className;
 
-    sendToSheet(name, confidence);
+    fetch(SHEET_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        name: best.className,
+        status: "Present",
+        confidence: best.probability.toFixed(2)
+      })
+    });
   }
 }
 
-function sendToSheet(name, confidence) {
-  let now = new Date();
-
-  fetch(SHEET_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      time: now.toLocaleTimeString(),
-      name: name,
-      status: "Present",
-      confidence: confidence
-    })
-  });
-}
 </script>
 
 </body>
