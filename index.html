@@ -1,158 +1,66 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart-Attend</title>
-
-  <!-- ✅ WAJIB: Teachable Machine load dulu -->
-<script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
-
-  <style>
-    body {
-      font-family: Arial;
-      text-align: center;
-      background: #eef5fb;
-    }
-
-    h1 { color: #0a4d8c; }
-
-    .box {
-      margin: 20px;
-      padding: 20px;
-      background: white;
-      border-radius: 15px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-    }
-
-    video {
-      border-radius: 10px;
-    }
-
-    #name, #temp, #status {
-      font-size: 22px;
-      font-weight: bold;
-      margin: 10px;
-    }
-
-    #status { color: green; }
-
-    button {
-      padding: 15px 25px;
-      margin: 10px;
-      border: none;
-      border-radius: 10px;
-      background: #0a4d8c;
-      color: white;
-      font-size: 16px;
-    }
-  </style>
+  <title>Smart Camera AI</title>
 </head>
 
 <body>
+  <h2>AI Camera Test</h2>
 
-<h1>Smart-Attend</h1>
+  <button onclick="init()">Start Camera</button>
 
-<div class="box">
-  <video id="webcam" autoplay playsinline width="250"></video>
-  <div id="name">Student: -</div>
-  <div id="temp">Temp: -</div>
-  <div id="status">Loading...</div>
-</div>
+  <div id="webcam-container"></div>
+  <div id="label-container"></div>
 
-<button onclick="recordData()">Record</button>
+  <!-- ✅ Teachable Machine library (WAJIB atas) -->
+  <script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
 
-<script>
-let studentName = "-";
-let temperature = 36.5;
-let model;
+  <script>
+    // 🔥 LETAK LINK MODEL KAU SINI
+    const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
 
-const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
+    let model, webcam, labelContainer, maxPredictions;
 
-// ✅ INIT
-async function init() {
-  try {
-    // load model
-    model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+    async function init() {
+      const modelURL = URL + "model.json";
+      const metadataURL = URL + "metadata.json";
 
-    // start camera
-    const webcam = document.getElementById("webcam");
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    webcam.srcObject = stream;
+      // load model
+      model = await tmImage.load(modelURL, metadataURL);
+      maxPredictions = model.getTotalClasses();
 
-    document.getElementById("status").innerText = "Camera Ready ✅";
+      // setup webcam
+      webcam = new tmImage.Webcam(200, 200, true);
+      await webcam.setup();
+      await webcam.play();
 
-    // run AI setiap 1.5s
-    setInterval(predict, 1500);
+      window.requestAnimationFrame(loop);
 
-  } catch (err) {
-    console.error(err);
-    document.getElementById("status").innerText = "Camera Error: " + err.message;
-  }
-}
+      document.getElementById("webcam-container").appendChild(webcam.canvas);
 
-// ✅ AI DETECT
-async function predict() {
-  const webcam = document.getElementById("webcam");
+      labelContainer = document.getElementById("label-container");
+      labelContainer.innerHTML = "";
+      for (let i = 0; i < maxPredictions; i++) {
+        labelContainer.appendChild(document.createElement("div"));
+      }
+    }
 
-  if (!model) return;
+    async function loop() {
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
 
-  const prediction = await model.predict(webcam);
-  prediction.sort((a,b)=>b.probability-a.probability);
+    async function predict() {
+      const prediction = await model.predict(webcam.canvas);
 
-  let result = prediction[0];
+      for (let i = 0; i < maxPredictions; i++) {
+        const classPrediction =
+          prediction[i].className + ": " + prediction[i].probability.toFixed(2);
 
-  if(result.probability < 0.85){
-    studentName = "Pelajar tak dikenal";
-  } else {
-    if(result.className == "Aniq") studentName = "Aniq";
-    else if(result.className == "Huzaifah") studentName = "Huzaifah";
-    else if(result.className == "Aedil") studentName = "Aedil";
-  }
-
-  document.getElementById("name").innerText = "Student: " + studentName;
-}
-
-// 🌡️ TEMP SIMULATE
-function getTemp(){
-  return (36 + Math.random()).toFixed(1);
-}
-
-// 📤 RECORD DATA
-function recordData(){
-  temperature = getTemp();
-
-  let now = new Date();
-
-  let data = {
-    tarikh: now.toLocaleDateString(),
-    masa: now.toLocaleTimeString(),
-    nama: studentName,
-    suhu: temperature,
-    status: temperature > 37.5 ? "Demam" : "Normal"
-  };
-
-  // 🔴 GANTI LINK NI
- fetch("URL_KAU", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify(data)
-  })
-  .then(res => res.text())
-  .then(() => {
-    document.getElementById("status").innerText = "Recorded ✅";
-  })
-  .catch(() => {
-    document.getElementById("status").innerText = "Error ❌";
-  });
-
-  document.getElementById("temp").innerText = "Temp: " + temperature;
-}
-
-// AUTO START
-window.onload = init;
-
-</script>
-
+        labelContainer.childNodes[i].innerHTML = classPrediction;
+      }
+    }
+  </script>
 </body>
 </html>
