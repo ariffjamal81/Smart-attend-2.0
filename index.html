@@ -2,6 +2,8 @@
 <html>
 <head>
   <title>Smart-Attend</title>
+
+  <!-- ✅ WAJIB: Teachable Machine load dulu -->
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest"></script>
 
   <style>
@@ -21,7 +23,9 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
 
-    video { border-radius: 10px; }
+    video {
+      border-radius: 10px;
+    }
 
     #name, #temp, #status {
       font-size: 22px;
@@ -51,7 +55,7 @@
   <video id="webcam" autoplay playsinline width="250"></video>
   <div id="name">Student: -</div>
   <div id="temp">Temp: -</div>
-  <div id="status">Status: Loading...</div>
+  <div id="status">Loading...</div>
 </div>
 
 <button onclick="recordData()">Record</button>
@@ -59,36 +63,41 @@
 <script>
 let studentName = "-";
 let temperature = 36.5;
+let model;
 
 const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
 
-let model;
-
-// 🔥 INIT CAMERA + MODEL
+// ✅ INIT
 async function init() {
   try {
+    // load model
     model = await tmImage.load(URL + "model.json", URL + "metadata.json");
 
+    // start camera
     const webcam = document.getElementById("webcam");
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     webcam.srcObject = stream;
 
-    document.getElementById("status").innerText = "Camera Ready";
+    document.getElementById("status").innerText = "Camera Ready ✅";
 
+    // run AI setiap 1.5s
     setInterval(predict, 1500);
 
   } catch (err) {
     console.error(err);
-    document.getElementById("status").innerText = "Camera Error!";
+    document.getElementById("status").innerText = "Camera Error: " + err.message;
   }
 }
 
-// 🔍 AI DETECT
+// ✅ AI DETECT
 async function predict() {
   const webcam = document.getElementById("webcam");
-  const prediction = await model.predict(webcam);
 
+  if (!model) return;
+
+  const prediction = await model.predict(webcam);
   prediction.sort((a,b)=>b.probability-a.probability);
+
   let result = prediction[0];
 
   if(result.probability < 0.85){
@@ -102,36 +111,38 @@ async function predict() {
   document.getElementById("name").innerText = "Student: " + studentName;
 }
 
-// 🌡️ SIMULATE TEMP (boleh upgrade BLE nanti)
+// 🌡️ TEMP SIMULATE
 function getTemp(){
   return (36 + Math.random()).toFixed(1);
 }
 
-// 📤 SEND TO GOOGLE SHEETS
+// 📤 RECORD DATA
 function recordData(){
   temperature = getTemp();
 
   let now = new Date();
-  let tarikh = now.toLocaleDateString();
-  let masa = now.toLocaleTimeString();
 
   let data = {
-    tarikh: tarikh,
-    masa: masa,
+    tarikh: now.toLocaleDateString(),
+    masa: now.toLocaleTimeString(),
     nama: studentName,
     suhu: temperature,
     status: temperature > 37.5 ? "Demam" : "Normal"
   };
 
-  fetch("https://script.google.com/macros/s/AKfycbymzk3NYuErjgQyL9hvqpJJ6Y18YZQLG00NqVmxP_4CKTxm8BUykDMh54xz8NKcX4SFIA/exec", {
-    method: "POST",
-    body: JSON.stringify(data)
+  // 🔴 GANTI LINK NI
+ fetch("URL_KAU", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify(data)
   })
   .then(res => res.text())
-  .then(res => {
+  .then(() => {
     document.getElementById("status").innerText = "Recorded ✅";
   })
-  .catch(err => {
+  .catch(() => {
     document.getElementById("status").innerText = "Error ❌";
   });
 
