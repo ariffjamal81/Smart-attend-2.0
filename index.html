@@ -11,9 +11,7 @@
       background: #eef5fb;
     }
 
-    h1 {
-      color: #0a4d8c;
-    }
+    h1 { color: #0a4d8c; }
 
     .box {
       margin: 20px;
@@ -23,9 +21,7 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
 
-    video {
-      border-radius: 10px;
-    }
+    video { border-radius: 10px; }
 
     #name, #temp, #status {
       font-size: 22px;
@@ -33,9 +29,7 @@
       margin: 10px;
     }
 
-    #status {
-      color: green;
-    }
+    #status { color: green; }
 
     button {
       padding: 15px 25px;
@@ -57,34 +51,97 @@
   <video id="webcam" autoplay playsinline width="250"></video>
   <div id="name">Student: -</div>
   <div id="temp">Temp: -</div>
-  <div id="status">Status: -</div>
+  <div id="status">Status: Loading...</div>
 </div>
 
-<button onclick="connectBLE()">Connect Sensor</button>
 <button onclick="recordData()">Record</button>
 
 <script>
 let studentName = "-";
 let temperature = 36.5;
 
-// TEACHABLE MACHINE MODEL
 const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
 
+let model;
+
+// 🔥 INIT CAMERA + MODEL
 async function init() {
-  const model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+  try {
+    model = await tmImage.load(URL + "model.json", URL + "metadata.json");
 
+    const webcam = document.getElementById("webcam");
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    webcam.srcObject = stream;
+
+    document.getElementById("status").innerText = "Camera Ready";
+
+    setInterval(predict, 1500);
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById("status").innerText = "Camera Error!";
+  }
+}
+
+// 🔍 AI DETECT
+async function predict() {
   const webcam = document.getElementById("webcam");
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  webcam.srcObject = stream;
+  const prediction = await model.predict(webcam);
 
-  setInterval(async () => {
-    const prediction = await model.predict(webcam);
-    prediction.sort((a,b)=>b.probability-a.probability);
+  prediction.sort((a,b)=>b.probability-a.probability);
+  let result = prediction[0];
 
-    let result = prediction[0];
+  if(result.probability < 0.85){
+    studentName = "Pelajar tak dikenal";
+  } else {
+    if(result.className == "Aniq") studentName = "Aniq";
+    else if(result.className == "Huzaifah") studentName = "Huzaifah";
+    else if(result.className == "Aedil") studentName = "Aedil";
+  }
 
-    if(result.probability < 0.85){
-      studentName = "Pelajar tak dikenal";
-    } else {
-      if(result.className == "Aniq") studentName = "Aniq";
-      else if(result.className == "Huzaifah") studentName = "Hu
+  document.getElementById("name").innerText = "Student: " + studentName;
+}
+
+// 🌡️ SIMULATE TEMP (boleh upgrade BLE nanti)
+function getTemp(){
+  return (36 + Math.random()).toFixed(1);
+}
+
+// 📤 SEND TO GOOGLE SHEETS
+function recordData(){
+  temperature = getTemp();
+
+  let now = new Date();
+  let tarikh = now.toLocaleDateString();
+  let masa = now.toLocaleTimeString();
+
+  let data = {
+    tarikh: tarikh,
+    masa: masa,
+    nama: studentName,
+    suhu: temperature,
+    status: temperature > 37.5 ? "Demam" : "Normal"
+  };
+
+  fetch("YOUR_GOOGLE_SCRIPT_URL", {
+    method: "POST",
+    body: JSON.stringify(data)
+  })
+  .then(res => res.text())
+  .then(res => {
+    document.getElementById("status").innerText = "Recorded ✅";
+  })
+  .catch(err => {
+    document.getElementById("status").innerText = "Error ❌";
+  });
+
+  document.getElementById("temp").innerText = "Temp: " + temperature;
+}
+
+// AUTO START
+window.onload = init;
+
+</script>
+
+</body>
+</html>
