@@ -2,56 +2,89 @@
 <html lang="ms">
 <head>
     <meta charset="UTF-8">
-    <title>Smart Attend Saujana 2.0 - AI + Sensor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attend Saujana 2.0 - Official Stable</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f0f2f5; padding: 20px; }
-        #webcam-container { margin: 20px auto; border: 10px solid #333; border-radius: 15px; width: max-content; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
-        .status-box { background: white; padding: 20px; border-radius: 10px; display: inline-block; min-width: 300px; margin-top: 10px; }
-        #label-container { font-size: 24px; font-weight: bold; color: #007bff; }
-        #temp-display { font-size: 20px; color: #dc3545; margin-top: 10px; }
-        .btn { padding: 15px 40px; font-size: 18px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 8px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background-color: #eef2f7; padding: 20px; }
+        h2 { color: #2c3e50; margin-bottom: 5px; }
+        #webcam-container { margin: 20px auto; border: 8px solid #2c3e50; border-radius: 15px; width: max-content; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        
+        .status-box { 
+            background: white; padding: 20px; border-radius: 12px; display: inline-block; 
+            min-width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.4s ease;
+        }
+        
+        /* Amaran Suhu Tinggi */
+        .alert-danger { 
+            background-color: #ff4d4d !important; color: white !important;
+            border: 4px solid #b30000; animation: pulse 1s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
+
+        #label-container { font-size: 26px; font-weight: bold; margin-bottom: 10px; }
+        #temp-display { font-size: 22px; font-weight: 500; }
+        #warning-text { color: #fff; font-weight: bold; font-size: 18px; display: none; margin-top: 10px; }
+        
+        .btn { padding: 15px 40px; font-size: 18px; cursor: pointer; background: #27ae60; color: white; border: none; border-radius: 8px; font-weight: bold; }
+        .btn:hover { background: #219150; }
     </style>
 </head>
 <body>
 
     <h2>Smart Attend Saujana 2.0</h2>
-    <button class="btn" onclick="init()">MULAKAN SISTEM</button>
+    <p>Innovation Project | GMI 2026</p>
+    
+    <button class="btn" id="start-btn" onclick="init()">START SYSTEM</button>
 
     <div id="webcam-container"></div>
     
-    <div class="status-box">
-        <div id="label-container">Sila mulakan kamera</div>
-        <div id="temp-display">Suhu Sensor: -- °C</div>
+    <div class="status-box" id="main-box">
+        <div id="label-container">System Offline</div>
+        <div id="temp-display">Temperature: -- °C</div>
+        <div id="warning-text">⚠️ WARNING: HIGH TEMPERATURE!</div>
     </div>
 
     <script>
-        // --- KONFIGURASI ---
+        // --- KONFIGURASI (KEMASKINI DI SINI) ---
         const URL_MODEL = "https://teachablemachine.withgoogle.com/models/siii58vzR/"; 
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYZzHEJISGj_WQB43wlhxx5aWF0JAIFVdiUJRT1EhxqFm8KNjvOA9oIXeTcF8xKpsCXw/exec"; 
-        const IP_ESP32 = "http://172.20.10.4/temp"; // Pastikan path /temp ada dalam kod ESP
-        // -------------------
+        const IP_ESP32 = "http://172.20.10.4/temp"; 
+        // ---------------------------------------
 
-        let model, webcam, labelContainer, tempDisplay, maxPredictions;
+        let model, webcam, labelContainer, maxPredictions;
         let isProcessing = false;
-        let currentSuhu = "0.0";
+        let currentSuhu = 0.0;
 
-        // Fungsi ambil suhu dari ESP32 setiap 2 saat
-        async function getTemperature() {
+        // Ambil suhu dari ESP32 setiap 1.5 saat
+        async function fetchTemp() {
             try {
-                const response = await fetch(IP_ESP32);
-                const data = await response.text();
-                currentSuhu = data;
-                document.getElementById("temp-display").innerHTML = "Suhu Sensor: " + data + " °C";
-            } catch (err) {
-                console.log("Gagal akses ESP32");
-            }
+                const res = await fetch(IP_ESP32);
+                const val = await res.text();
+                currentSuhu = parseFloat(val);
+                
+                const box = document.getElementById("main-box");
+                const warning = document.getElementById("warning-text");
+                const tempDiv = document.getElementById("temp-display");
+
+                tempDiv.innerHTML = "Temperature: " + val + " °C";
+
+                if (currentSuhu >= 37.5) {
+                    box.classList.add("alert-danger");
+                    warning.style.display = "block";
+                } else {
+                    box.classList.remove("alert-danger");
+                    warning.style.display = "none";
+                }
+            } catch (e) { console.log("ESP32 Connection Lost"); }
         }
-        setInterval(getTemperature, 2000);
+        setInterval(fetchTemp, 1500);
 
         async function init() {
-            document.getElementById("label-container").innerHTML = "Memuatkan AI...";
+            document.getElementById("start-btn").style.display = "none";
+            document.getElementById("label-container").innerHTML = "Loading AI Model...";
+            
             model = await tmImage.load(URL_MODEL + "model.json", URL_MODEL + "metadata.json");
             maxPredictions = model.getTotalClasses();
 
@@ -61,7 +94,7 @@
             window.requestAnimationFrame(loop);
 
             document.getElementById("webcam-container").appendChild(webcam.canvas);
-            document.getElementById("label-container").innerHTML = "Sedia untuk Scan";
+            document.getElementById("label-container").innerHTML = "Ready to Scan";
         }
 
         async function loop() {
@@ -76,33 +109,31 @@
                 const prob = prediction[i].probability;
                 const name = prediction[i].className;
 
-                // Papar nama & peratusan live
                 if (prob > 0.15) {
                     document.getElementById("label-container").innerHTML = name + " (" + (prob * 100).toFixed(0) + "%)";
                 }
 
-                // Jika yakin > 90%
-                if (prob > 0.90 && name !== "Class 2" && !isProcessing) {
+                if (prob > 0.92 && name !== "Class 2" && !isProcessing) {
                     isProcessing = true;
-                    const confidence = (prob * 100).toFixed(0) + "%";
-                    hantarData(name, currentSuhu, confidence);
+                    hantarKeSheets(name, currentSuhu, (prob * 100).toFixed(0) + "%");
                 }
             }
         }
 
-        function hantarData(nama, suhu, peratus) {
-            document.getElementById("label-container").innerHTML = "Merekod: " + nama;
+        function hantarKeSheets(name, temp, conf) {
+            let healthStatus = temp >= 37.5 ? "DANGER: FEVER" : "Normal";
             
             fetch(SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 body: JSON.stringify({
-                    name: nama,
-                    temperature: suhu,
-                    status: "Hadir (" + peratus + ")"
+                    name: name,
+                    temperature: temp,
+                    status: healthStatus + " (" + conf + ")"
                 })
             }).then(() => {
-                console.log("Berjaya!");
+                document.getElementById("label-container").innerHTML = "RECORDED: " + name;
+                // Cooldown 8 saat
                 setTimeout(() => { isProcessing = false; }, 8000);
             });
         }
