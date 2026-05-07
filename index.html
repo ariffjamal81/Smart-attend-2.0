@@ -1,71 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="ms">
 <head>
-    <title>Smart Attend 2.0 - Face Sync</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background-color: #f4f7f6; }
-        #webcam-container { margin: 20px auto; border: 6px solid #2c3e50; width: 400px; height: 400px; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-        .controls { background: white; padding: 25px; border-radius: 20px; display: inline-block; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #007bff; }
-        
-        /* Gaya untuk nama pelajar yang dikesan */
-        #detected-name { margin-top: 20px; font-size: 28px; font-weight: bold; color: #007bff; height: 40px; }
-        
-        button { padding: 12px 30px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 8px; font-size: 16px; transition: 0.3s; }
-        button:hover { background-color: #0056b3; transform: scale(1.05); }
-        .status-log { color: #28a745; font-weight: bold; margin-top: 15px; min-height: 20px; }
-        input { padding: 8px; border: 1px solid #ccc; border-radius: 5px; text-align: center; width: 150px; }
-    </style>
+    <meta charset="UTF-8">
+    <title>Smart Attend Saujana 2.0</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; }
+        #webcam-container { margin: 20px auto; border: 5px solid #333; width: max-content; }
+        #label-container { font-size: 24px; font-weight: bold; margin-top: 10px; }
+        .btn { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+    </style>
 </head>
 <body>
-    <h1>Smart Attend Saujana (Sync Mode)</h1>
+
+    <h2>Smart Attend Saujana - Sistem Kehadiran AI</h2>
     
-    <div class="controls">
-        <p>1. Masukkan IP ESP32 (dari Serial Monitor):</p>
-        <input type="text" id="espIp" value="172.20.10.4">
-        <br><br>
-        <button type="button" id="startBtn" onclick="init()">2. Aktifkan Kamera</button>
-        <div id="statusUpdate" class="status-log"></div>
-    </div>
+    <button class="btn" type="button" onclick="init()">MULAKAN KAMERA</button>
 
     <div id="webcam-container"></div>
-    
-    <div id="detected-name">Sila Aktifkan Kamera</div>
+    <div id="label-container">Menunggu kamera...</div>
 
     <script type="text/javascript">
-        // 1. Letakkan URL model Teachable Machine anda
-        const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/"; 
-        
-        // 2. Letakkan URL Google Apps Script Web App anda
-        const GS_URL = "https://script.google.com/macros/s/AKfycbym-JO3YFYa0sqxv0qfQSrHq4d5LOI_lixY-hDRq7xKuhOrSFfFrEanC2MY3bHLKwFdsQ/exec";
+        // 1. Masukkan URL model Teachable Machine anda di sini
+        const URL_MODEL = "MASUKKAN_LINK_MODEL_ANDA_DI_SINI/"; 
 
-        let model, webcam, maxPredictions;
-        let lastSentTime = 0;
+        // 2. Masukkan URL Google Web App (Apps Script) anda di sini
+        const SCRIPT_URL = "URL_WEB_APP_ANDA"; 
+
+        let model, webcam, labelContainer, maxPredictions;
+        let isProcessing = false;
 
         async function init() {
-            try {
-                document.getElementById("startBtn").innerHTML = "Memuatkan Model...";
-                const modelURL = URL + "model.json";
-                const metadataURL = URL + "metadata.json";
+            const modelURL = URL_MODEL + "model.json";
+            const metadataURL = URL_MODEL + "metadata.json";
 
-                model = await tmImage.load(modelURL, metadataURL);
-                maxPredictions = model.getTotalClasses();
+            // Load model
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
 
-                webcam = new tmImage.Webcam(400, 400, true);
-                await webcam.setup();
-                await webcam.play();
-                
-                window.requestAnimationFrame(loop);
+            // Setup webcam
+            const flip = true; 
+            webcam = new tmImage.Webcam(400, 400, flip); 
+            await webcam.setup(); 
+            await webcam.play();
+            window.requestAnimationFrame(loop);
 
-                document.getElementById("webcam-container").innerHTML = "";
-                document.getElementById("webcam-container").appendChild(webcam.canvas);
-                document.getElementById("detected-name").innerHTML = "Sedia Mendeteksi...";
-                document.getElementById("startBtn").innerHTML = "Camera Active ✅";
-            } catch (e) {
-                console.error(e);
-                alert("Ralat: Pastikan URL Model betul dan benarkan kamera.");
-            }
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
         }
 
         async function loop() {
@@ -76,48 +58,36 @@
 
         async function predict() {
             const prediction = await model.predict(webcam.canvas);
-            let best = { name: "", prob: 0 };
-
+            
             for (let i = 0; i < maxPredictions; i++) {
-                if (prediction[i].probability > best.prob) {
-                    best = { name: prediction[i].className, prob: prediction[i].probability };
+                const name = prediction[i].className;
+                const probability = prediction[i].probability.toFixed(2);
+
+                if (probability > 0.90 && name !== "Class 2" && !isProcessing) { 
+                    labelContainer.innerHTML = "Selamat Datang: " + name;
+                    sendDataToSheets(name);
                 }
-            }
-
-            const nameDisplay = document.getElementById("detected-name");
-            const ip = document.getElementById("espIp").value;
-            const isReady = (Date.now() - lastSentTime) > 10000; 
-
-            // Papar nama jika yakin > 90%
-            if (best.prob > 0.90 && best.name !== "Unknown") {
-                nameDisplay.innerHTML = "Dikesan: " + best.name;
-                
-                if (isReady) {
-                    lastSentTime = Date.now();
-                    document.getElementById("statusUpdate").innerHTML = "Menghantar: " + best.name;
-                    
-                    sendToESP32(ip, best.name);
-                    sendToGSheet(best.name);
-
-                    setTimeout(() => { document.getElementById("statusUpdate").innerHTML = ""; }, 3000);
-                }
-            } else {
-                nameDisplay.innerHTML = "Mencari Muka...";
             }
         }
 
-        function sendToESP32(ip, name) {
-            const finalUrl = http://${ip}/update?name=${encodeURIComponent(name)};
-            fetch(finalUrl, { mode: 'no-cors' }) 
-                .then(() => console.log("ESP32 OK"))
-                .catch(err => console.error("Ralat ESP32: " + err));
-        }
-
-        function sendToGSheet(name) {
-            const finalGsUrl = ${GS_URL}?name=${encodeURIComponent(name)};
-            fetch(finalGsUrl)
-                .then(res => console.log("GSheet OK"))
-                .catch(err => console.error("Ralat GSheet: " + err));
+        function sendDataToSheets(name) {
+            isProcessing = true; // Elakkan data hantar berkali-kali serentak
+            
+            fetch(SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                cache: 'no-cache',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nama: name, timestamp: new Date() })
+            })
+            .then(() => {
+                console.log("Data berjaya dihantar untuk: " + name);
+                setTimeout(() => { isProcessing = false; }, 5000); // Tunggu 5 saat sebelum boleh scan nama seterusnya
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                isProcessing = false;
+            });
         }
     </script>
 </body>
