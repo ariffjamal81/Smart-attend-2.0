@@ -1,139 +1,71 @@
 <!DOCTYPE html>
-<html>
+<html lang="ms">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Attend 2.0 - Sync</title>
-    <link rel="manifest" href="./manifest.json">
+    <title>Smart Attend - Saujana Impian</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background: #f2f4f8;
-            text-align: center;
-        }
-
-        .header {
-            background: #1e3a8a;
-            color: white;
-            padding: 15px;
-        }
-
-        .logo {
-            width: 80px;
-            margin-top: 10px;
-            border-radius: 10px;
-        }
-
-        .card {
-            background: white;
-            margin: 15px;
-            padding: 15px;
-            border-radius: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-
-        .btn-group {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-
-        button {
-            padding: 12px;
-            border: none;
-            background: #2563eb;
-            color: white;
-            border-radius: 10px;
-            font-size: 14px;
-            cursor: pointer;
-            flex: 1;
-            max-width: 150px;
-        }
-
-        button:hover {
-            background: #1d4ed8;
-        }
-
-        #webcam-container canvas {
-            width: 100%;
-            max-width: 400px;
-            border-radius: 10px;
-            border: 2px solid #ddd;
-        }
-
-        .result {
-            font-size: 18px;
-            font-weight: bold;
-            margin-top: 10px;
-            padding: 10px;
-            background: #eef2ff;
-            border-radius: 10px;
-        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f2f4f8; text-align: center; }
+        .header { background: #1e3a8a; color: white; padding: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .logo { width: 90px; margin-top: 10px; border-radius: 12px; border: 2px solid white; }
+        .card { background: white; margin: 20px auto; padding: 20px; border-radius: 20px; max-width: 450px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 20px; text-align: left; }
+        label { font-size: 14px; font-weight: bold; color: #333; margin-left: 5px; }
+        input { padding: 12px; border-radius: 10px; border: 2px solid #ddd; margin-top: 5px; width: 100%; box-sizing: border-box; font-size: 16px; }
+        button { padding: 15px; border: none; background: #2563eb; color: white; border-radius: 12px; font-size: 16px; font-weight: bold; width: 100%; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #1d4ed8; }
+        #webcam-container { margin-top: 15px; position: relative; }
+        #webcam-container canvas { width: 100%; border-radius: 15px; border: 3px solid #1e3a8a; }
+        .result { font-size: 20px; font-weight: bold; margin-top: 15px; padding: 15px; background: #eef2ff; border-radius: 12px; color: #1e3a8a; border-left: 5px solid #1e3a8a; }
     </style>
 </head>
-
 <body>
 
 <div class="header">
-    <h2>Smart Attend 2.0</h2>
-    <img class="logo" src="https://upload.wikimedia.org/wikipedia/ms/3/38/Sekolah_Menengah_Kebangsaan_Saujana_Impian.jpg" alt="Logo Saujana">
+    <img class="logo" src="https://upload.wikimedia.org/wikipedia/ms/3/38/Sekolah_Menengah_Kebangsaan_Saujana_Impian.jpg">
+    <h2>Smart Attend</h2>
+    <p>Sistem Kehadiran Muka dan Suhu</p>
 </div>
 
 <div class="card">
-    <div class="btn-group">
-        <button onclick="connectSerial()">1. Connect ESP32</button>
-        <button onclick="init()">2. Start Camera</button>
+    <div class="input-group">
+        <label>Alamat IP ESP32:</label>
+        <input type="text" id="espIp" placeholder="Contoh: 192.168.43.15" value="">
     </div>
-
+    <button onclick="init()">MULA IMBASAN</button>
+    
     <div id="webcam-container"></div>
-    <div class="result" id="label-container">Sila sambung ESP32 & Kamera</div>
+    <div class="result" id="label-container">Sila masukkan IP & Klik Mula</div>
 </div>
 
-<!-- TensorFlow + Teachable Machine -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 
 <script>
-    // Konfigurasi URL
+    // --- UPDATE BAHAGIAN INI ---
     const URL_MODEL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
     const SHEET_URL = "https://script.google.com/macros/s/AKfycbym-JO3YFYa0sqxv0qfQSrHq4d5LOI_lixY-hDRq7xKuhOrSFfFrEanC2MY3bHLKwFdsQ/exec";
+    // ----------------------------
 
-    let model, webcam, labelContainer, maxPredictions, port, writer;
-    let lastSent = "";
+    let model, webcam, labelContainer, lastSent = "";
 
-    // 1. Fungsi Connect ke ESP32 melalui USB
-    async function connectSerial() {
-        try {
-            port = await navigator.serial.requestPort();
-            await port.open({ baudRate: 115200 });
-            writer = port.writable.getWriter();
-            alert("ESP32 Berjaya Disambung!");
-        } catch (err) {
-            console.error("Gagal menyambung Serial:", err);
-            alert("Gagal sambung ke ESP32. Pastikan guna Chrome/Edge.");
-        }
-    }
-
-    // 2. Fungsi Mulakan Kamera & Model
     async function init() {
+        const ip = document.getElementById("espIp").value;
+        if(!ip) { alert("Sila masukkan IP ESP32 dahulu!"); return; }
+
         labelContainer = document.getElementById("label-container");
-        labelContainer.innerHTML = "Memuatkan model...";
+        labelContainer.innerHTML = "Memuatkan AI...";
 
         try {
             model = await tmImage.load(URL_MODEL + "model.json", URL_MODEL + "metadata.json");
-            maxPredictions = model.getTotalClasses();
-
             webcam = new tmImage.Webcam(400, 400, true);
             await webcam.setup();
             await webcam.play();
-
-            document.getElementById("webcam-container").innerHTML = ""; // Clear loading
+            document.getElementById("webcam-container").innerHTML = "";
             document.getElementById("webcam-container").appendChild(webcam.canvas);
-            
             window.requestAnimationFrame(loop);
         } catch (e) {
-            alert("Gagal memulakan kamera. Sila benarkan akses kamera.");
+            alert("Ralat Kamera: Sila benarkan akses kamera.");
         }
     }
 
@@ -145,46 +77,30 @@
 
     async function predict() {
         const prediction = await model.predict(webcam.canvas);
-        
-        // Cari hasil dengan probabiliti tertinggi
         let best = prediction[0];
         for (let i = 0; i < prediction.length; i++) {
-            if (prediction[i].probability > best.probability) {
-                best = prediction[i];
-            }
+            if (prediction[i].probability > best.probability) { best = prediction[i]; }
         }
 
-        labelContainer.innerHTML = `👤 Nama: ${best.className}<br>📊 Ketepatan: ${(best.probability * 100).toFixed(0)}%`;
+        labelContainer.innerHTML = `👤 Nama: ${best.className}<br>📊 Konfiden: ${(best.probability * 100).toFixed(0)}%`;
 
-        // Logik penghantaran data (Hanya jika > 90% dan nama baru dipesan)
-        if (best.probability > 0.90 && lastSent !== best.className && best.className !== "Class 1") {
+        // Logik penghantaran (Hanya jika > 90% ketepatan)
+        if (best.probability > 0.90 && lastSent !== best.className && best.className !== "Tidak Dikenali") {
             lastSent = best.className;
+            const espIp = document.getElementById("espIp").value;
 
-            // A. Hantar ke ESP32 (untuk trigger suhu/servo dll)
-            if (writer) {
-                const encoder = new TextEncoder();
-                await writer.write(encoder.encode(best.className + "\n"));
-                console.log("Nama dihantar ke ESP32:", best.className);
-            }
+            // 1. Trigger ESP32 (WiFi)
+            fetch(`http://${espIp}/update?name=${encodeURIComponent(best.className)}`)
+                .then(() => console.log("ESP32 Notified"))
+                .catch(err => console.error("ESP32 Offline"));
 
-            // B. Hantar ke Google Sheets (Database)
+            // 2. Simpan ke Google Sheets
             fetch(SHEET_URL, {
                 method: "POST",
-                mode: "no-cors", // Penting untuk elak error CORS Apps Script
-                body: JSON.stringify({
-                    name: best.className,
-                    status: "Present",
-                    confidence: best.probability.toFixed(2)
-                })
-            }).then(() => console.log("Data dihantar ke Google Sheets"));
+                mode: "no-cors",
+                body: JSON.stringify({ name: best.className, status: "Hadir" })
+            });
         }
-    }
-
-    // Service Worker untuk PWA
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW fail', err));
-        });
     }
 </script>
 </body>
