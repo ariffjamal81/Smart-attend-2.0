@@ -1,148 +1,191 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Attend 2.0</title>
-<link rel="manifest" href="./manifest.json">
-  <style>
-    body {
-      font-family: Arial;
-      margin: 0;
-      background: #f2f4f8;
-      text-align: center;
-    }
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Attend 2.0 - Sync</title>
+    <link rel="manifest" href="./manifest.json">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f2f4f8;
+            text-align: center;
+        }
 
-    .header {
-      background: #1e3a8a;
-      color: white;
-      padding: 15px;
-    }
+        .header {
+            background: #1e3a8a;
+            color: white;
+            padding: 15px;
+        }
 
-    .logo {
-      width: 80px;
-      margin-top: 10px;
-      border-radius: 10px;
-    }
+        .logo {
+            width: 80px;
+            margin-top: 10px;
+            border-radius: 10px;
+        }
 
-    .card {
-      background: white;
-      margin: 15px;
-      padding: 15px;
-      border-radius: 15px;
-    }
+        .card {
+            background: white;
+            margin: 15px;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
 
-    button {
-      padding: 12px;
-      border: none;
-      background: #2563eb;
-      color: white;
-      border-radius: 10px;
-      font-size: 16px;
-    }
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
 
-    #webcam-container canvas {
-      width: 100%;
-      border-radius: 10px;
-    }
+        button {
+            padding: 12px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            flex: 1;
+            max-width: 150px;
+        }
 
-    .result {
-      font-size: 18px;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-  </style>
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        #webcam-container canvas {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            border: 2px solid #ddd;
+        }
+
+        .result {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+            padding: 10px;
+            background: #eef2ff;
+            border-radius: 10px;
+        }
+    </style>
 </head>
 
 <body>
 
 <div class="header">
-  <h2>Smart Attend 2.0</h2>
-
-  <img class="logo"
-  src="https://upload.wikimedia.org/wikipedia/ms/3/38/Sekolah_Menengah_Kebangsaan_Saujana_Impian.jpg">
+    <h2>Smart Attend 2.0</h2>
+    <img class="logo" src="https://upload.wikimedia.org/wikipedia/ms/3/38/Sekolah_Menengah_Kebangsaan_Saujana_Impian.jpg" alt="Logo Saujana">
 </div>
 
 <div class="card">
-  <button onclick="init()">Start Camera</button>
+    <div class="btn-group">
+        <button onclick="connectSerial()">1. Connect ESP32</button>
+        <button onclick="init()">2. Start Camera</button>
+    </div>
 
-  <div id="webcam-container"></div>
-
-  <div class="result" id="label-container">Ready</div>
+    <div id="webcam-container"></div>
+    <div class="result" id="label-container">Sila sambung ESP32 & Kamera</div>
 </div>
 
 <!-- TensorFlow + Teachable Machine -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-<script src="https://unpkg.com/@teachablemachine/image@0.8.5/dist/teachablemachine-image.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 
 <script>
+    // Konfigurasi URL
+    const URL_MODEL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
+    const SHEET_URL = "https://script.google.com/macros/s/AKfycby2uL-prsDJKi3uFdpzauEtkyziP7Ty2V_7Wpbg7KEi3tTwpuRZzVWCcm88tBNquuQMjA/exec";
 
-const URL = "https://teachablemachine.withgoogle.com/models/siii58vzR/";
+    let model, webcam, labelContainer, maxPredictions, port, writer;
+    let lastSent = "";
 
-/* 🔥 PASTE WEB APP LINK KAU SINI */
-const SHEET_URL = "https://script.google.com/macros/s/AKfycby2uL-prsDJKi3uFdpzauEtkyziP7Ty2V_7Wpbg7KEi3tTwpuRZzVWCcm88tBNquuQMjA/exec";
-
-let model, webcam, labelContainer, maxPredictions;
-
-async function init() {
-  model = await tmImage.load(URL + "model.json", URL + "metadata.json");
-
-  webcam = new tmImage.Webcam(250, 250, true);
-  await webcam.setup();
-  await webcam.play();
-
-  document.getElementById("webcam-container").appendChild(webcam.canvas);
-
-  labelContainer = document.getElementById("label-container");
-
-  window.requestAnimationFrame(loop);
-}
-
-async function loop() {
-  webcam.update();
-  await predict();
-  window.requestAnimationFrame(loop);
-}
-
-let lastSent = "";
-
-async function predict() {
-  let prediction = await model.predict(webcam.canvas);
-
-  let best = prediction[0];
-
-  for (let i = 0; i < prediction.length; i++) {
-    if (prediction[i].probability > best.probability) {
-      best = prediction[i];
+    // 1. Fungsi Connect ke ESP32 melalui USB
+    async function connectSerial() {
+        try {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 115200 });
+            writer = port.writable.getWriter();
+            alert("ESP32 Berjaya Disambung!");
+        } catch (err) {
+            console.error("Gagal menyambung Serial:", err);
+            alert("Gagal sambung ke ESP32. Pastikan guna Chrome/Edge.");
+        }
     }
-  }
 
-  labelContainer.innerHTML =
-    "👤 " + best.className +
-    "<br>📊 " + best.probability.toFixed(2);
+    // 2. Fungsi Mulakan Kamera & Model
+    async function init() {
+        labelContainer = document.getElementById("label-container");
+        labelContainer.innerHTML = "Memuatkan model...";
 
-  if (best.probability > 0.85 && lastSent !== best.className) {
-    lastSent = best.className;
+        try {
+            model = await tmImage.load(URL_MODEL + "model.json", URL_MODEL + "metadata.json");
+            maxPredictions = model.getTotalClasses();
 
-    fetch(SHEET_URL, {
-      method: "POST",
-      body: JSON.stringify({
-        name: best.className,
-        status: "Present",
-        confidence: best.probability.toFixed(2)
-      })
-    });
-  }
-}
+            webcam = new tmImage.Webcam(400, 400, true);
+            await webcam.setup();
+            await webcam.play();
 
-</script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('Service worker registered', reg))
-        .catch(err => console.log('Service worker not registered', err));
-    });
-  }
+            document.getElementById("webcam-container").innerHTML = ""; // Clear loading
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            window.requestAnimationFrame(loop);
+        } catch (e) {
+            alert("Gagal memulakan kamera. Sila benarkan akses kamera.");
+        }
+    }
+
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        
+        // Cari hasil dengan probabiliti tertinggi
+        let best = prediction[0];
+        for (let i = 0; i < prediction.length; i++) {
+            if (prediction[i].probability > best.probability) {
+                best = prediction[i];
+            }
+        }
+
+        labelContainer.innerHTML = `👤 Nama: ${best.className}<br>📊 Ketepatan: ${(best.probability * 100).toFixed(0)}%`;
+
+        // Logik penghantaran data (Hanya jika > 90% dan nama baru dipesan)
+        if (best.probability > 0.90 && lastSent !== best.className && best.className !== "Class 1") {
+            lastSent = best.className;
+
+            // A. Hantar ke ESP32 (untuk trigger suhu/servo dll)
+            if (writer) {
+                const encoder = new TextEncoder();
+                await writer.write(encoder.encode(best.className + "\n"));
+                console.log("Nama dihantar ke ESP32:", best.className);
+            }
+
+            // B. Hantar ke Google Sheets (Database)
+            fetch(SHEET_URL, {
+                method: "POST",
+                mode: "no-cors", // Penting untuk elak error CORS Apps Script
+                body: JSON.stringify({
+                    name: best.className,
+                    status: "Present",
+                    confidence: best.probability.toFixed(2)
+                })
+            }).then(() => console.log("Data dihantar ke Google Sheets"));
+        }
+    }
+
+    // Service Worker untuk PWA
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW fail', err));
+        });
+    }
 </script>
 </body>
 </html>
